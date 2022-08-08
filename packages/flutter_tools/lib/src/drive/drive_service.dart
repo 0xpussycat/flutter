@@ -28,11 +28,11 @@ class FlutterDriverFactory {
     required ProcessUtils processUtils,
     required String dartSdkPath,
     required DevtoolsLauncher devtoolsLauncher,
-  }) : _applicationPackageFactory = applicationPackageFactory,
-       _logger = logger,
-       _processUtils = processUtils,
-       _dartSdkPath = dartSdkPath,
-       _devtoolsLauncher = devtoolsLauncher;
+  })  : _applicationPackageFactory = applicationPackageFactory,
+        _logger = logger,
+        _processUtils = processUtils,
+        _dartSdkPath = dartSdkPath,
+        _devtoolsLauncher = devtoolsLauncher;
 
   final ApplicationPackageFactory _applicationPackageFactory;
   final Logger _logger;
@@ -99,6 +99,7 @@ abstract class DriverService {
     int? driverPort,
     List<String> webBrowserFlags,
     List<String>? browserDimension,
+    List<String>? extensions,
     String? profileMemory,
   });
 
@@ -122,13 +123,14 @@ class FlutterDriverService extends DriverService {
     required ProcessUtils processUtils,
     required String dartSdkPath,
     required DevtoolsLauncher devtoolsLauncher,
-    @visibleForTesting VMServiceConnector vmServiceConnector = connectToVmService,
-  }) : _applicationPackageFactory = applicationPackageFactory,
-       _logger = logger,
-       _processUtils = processUtils,
-       _dartSdkPath = dartSdkPath,
-       _vmServiceConnector = vmServiceConnector,
-       _devtoolsLauncher = devtoolsLauncher;
+    @visibleForTesting
+        VMServiceConnector vmServiceConnector = connectToVmService,
+  })  : _applicationPackageFactory = applicationPackageFactory,
+        _logger = logger,
+        _processUtils = processUtils,
+        _dartSdkPath = dartSdkPath,
+        _vmServiceConnector = vmServiceConnector,
+        _devtoolsLauncher = devtoolsLauncher;
 
   static const int _kLaunchAttempts = 3;
 
@@ -158,15 +160,15 @@ class FlutterDriverService extends DriverService {
   }) async {
     if (buildInfo.isRelease) {
       throwToolExit(
-        'Flutter Driver (non-web) does not support running in release mode.\n'
-        '\n'
-        'Use --profile mode for testing application performance.\n'
-        'Use --debug (default) mode for testing correctness (with assertions).'
-      );
+          'Flutter Driver (non-web) does not support running in release mode.\n'
+          '\n'
+          'Use --profile mode for testing application performance.\n'
+          'Use --debug (default) mode for testing correctness (with assertions).');
     }
     _device = device;
     final TargetPlatform targetPlatform = await device.targetPlatform;
-    _applicationPackage = await _applicationPackageFactory.getPackageForPlatform(
+    _applicationPackage =
+        await _applicationPackageFactory.getPackageForPlatform(
       targetPlatform,
       buildInfo: buildInfo,
       applicationBinary: applicationBinary,
@@ -193,7 +195,8 @@ class FlutterDriverService extends DriverService {
       _logger.printError('Application failed to start on attempt: $attempt');
     }
     if (result == null || !result.started) {
-      throwToolExit('Application failed to start. Will not run test. Quitting.', exitCode: 1);
+      throwToolExit('Application failed to start. Will not run test. Quitting.',
+          exitCode: 1);
     }
     return reuseApplication(
       result.observatoryUri!,
@@ -236,8 +239,10 @@ class FlutterDriverService extends DriverService {
         // This can be ignored to continue to use the existing remote DDS instance.
       }
     }
-    _vmService = await _vmServiceConnector(uri, device: _device, logger: _logger);
-    final DeviceLogReader logReader = await device.getLogReader(app: _applicationPackage);
+    _vmService =
+        await _vmServiceConnector(uri, device: _device, logger: _logger);
+    final DeviceLogReader logReader =
+        await device.getLogReader(app: _applicationPackage);
     logReader.logLines.listen(_logger.printStatus);
 
     final vm_service.VM vm = await _vmService.service.getVM();
@@ -257,6 +262,7 @@ class FlutterDriverService extends DriverService {
     int? driverPort,
     List<String> webBrowserFlags = const <String>[],
     List<String>? browserDimension,
+    List<String>? extensions,
     String? profileMemory,
   }) async {
     if (profileMemory != null) {
@@ -289,30 +295,34 @@ class FlutterDriverService extends DriverService {
     String? userIdentifier,
   }) async {
     if (writeSkslOnExit != null) {
-      final FlutterView flutterView = (await _vmService.getFlutterViews()).first;
+      final FlutterView flutterView =
+          (await _vmService.getFlutterViews()).first;
       final Map<String, Object> result = await (_vmService.getSkSLs(
-        viewId: flutterView.id
-      ) as FutureOr<Map<String, Object>>);
-      await sharedSkSlWriter(_device!, result, outputFile: writeSkslOnExit, logger: _logger);
+          viewId: flutterView.id) as FutureOr<Map<String, Object>>);
+      await sharedSkSlWriter(_device!, result,
+          outputFile: writeSkslOnExit, logger: _logger);
     }
     // If the application package is available, stop and uninstall.
     if (_applicationPackage != null) {
-      if (!await _device!.stopApp(_applicationPackage, userIdentifier: userIdentifier)) {
+      if (!await _device!
+          .stopApp(_applicationPackage, userIdentifier: userIdentifier)) {
         _logger.printError('Failed to stop app');
       }
-      if (!await _device!.uninstallApp(_applicationPackage!, userIdentifier: userIdentifier)) {
+      if (!await _device!
+          .uninstallApp(_applicationPackage!, userIdentifier: userIdentifier)) {
         _logger.printError('Failed to uninstall app');
       }
     } else if (_device!.supportsFlutterExit) {
       // Otherwise use the VM Service URI to stop the app as a best effort approach.
       final vm_service.VM vm = await _vmService.service.getVM();
-      final vm_service.IsolateRef isolateRef = vm.isolates!
-        .firstWhere((vm_service.IsolateRef element) {
-          return !element.isSystemIsolate!;
-        });
+      final vm_service.IsolateRef isolateRef =
+          vm.isolates!.firstWhere((vm_service.IsolateRef element) {
+        return !element.isSystemIsolate!;
+      });
       unawaited(_vmService.flutterExit(isolateId: isolateRef.id!));
     } else {
-      _logger.printTrace('No application package for $_device, leaving app running');
+      _logger.printTrace(
+          'No application package for $_device, leaving app running');
     }
     await _device!.dispose();
   }
